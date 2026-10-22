@@ -37,7 +37,7 @@ HAL_StatusTypeDef INV_SamplingStop(void);
 /* 主循环读取一致快照；不会触发采样或 PI。 */
 void INV_SamplingGetData(INV_SamplingData *data);
 float INV_SamplingConvert(uint16_t raw, float k, float b);
-/* 由正弦表索引到 0 时通知，仅递增周期号。 */
+/* 电压正向过零时通知，仅递增周期号。 */
 void INV_SamplingNotifyCycle(void);
 /* 仅在 DMA 数据处理入口调用，以上一完整周期均值更新本周偏置。
  * 启动后的不完整周期丢弃；之后收满一周才置 offset_valid。

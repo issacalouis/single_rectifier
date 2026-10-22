@@ -1,5 +1,5 @@
-#include "inverter_sampling.h"
-#include "inverter_control_tools.h"
+#include "sampling.h"
+#include "single_rectifier_control.h"
 
 extern ADC_HandleTypeDef hadc1;
 
@@ -40,7 +40,7 @@ void INV_SamplingUpdateOffset(void)
     else
     {
         /* 丢失整周数据时旧偏置不可信，复位闭环等待新窗口。 */
-        if (sampling_data.offset_valid) INV_ResetVoltageControl();
+        if (sampling_data.offset_valid) SingleRectifier_ControlReset();
         sampling_data.offset_valid = 0U;
     }
 
@@ -53,7 +53,7 @@ void INV_SamplingUpdateOffset(void)
 
 static void SamplingProcessFrame(const volatile uint16_t *raw)
 {
-    /* 周期切换与累加均只在 DMA 回调中执行，TIM5 不读写这些状态。 */
+    /* 周期切换与累加均只在 DMA 回调中执行，主循环只读取快照。 */
     INV_SamplingUpdateOffset();
     for (uint32_t ch = 0; ch < INV_SAMPLE_CHANNELS; ch++)
     {
@@ -67,14 +67,24 @@ static void SamplingProcessFrame(const volatile uint16_t *raw)
     cycle_count++;
     sampling_data.sequence++;
     if (sampling_data.offset_valid != 0U)
-        INV_VoltageControlTick(sampling_data.ac[INV_FeedbackChannel]);
+    {
+        if (SingleRectifier_ControlStep(sampling_data.ac[INV_SAMPLE_VOLTAGE1],
+                                        sampling_data.ac[INV_SAMPLE_CURRENT]) != 0U)
+            INV_SamplingNotifyCycle();
+    }
+    else
+    {
+        /* 偏置未就绪时也推进锁相环，用开环过零点建立采样窗口。 */
+        if (SingleRectifier_ControlStep(0.0f, 0.0f) != 0U)
+            INV_SamplingNotifyCycle();
+    }
 }
 
 HAL_StatusTypeDef INV_SamplingStart(void)
 {
     /* 仅在采样停止时调用，避免与 DMA 数据处理并发复位。 */
     sampling_data = (INV_SamplingData){0};
-    INV_ResetVoltageControl();
+    SingleRectifier_ControlReset();
     previous_cycle = sampling_cycle;
     cycle_synced = 0U;
     cycle_count = 0U;
@@ -94,7 +104,7 @@ HAL_StatusTypeDef INV_SamplingStop(void)
     if (status == HAL_OK)
     {
         sampling_data.offset_valid = 0U;
-        INV_ResetVoltageControl();
+        SingleRectifier_ControlReset();
     }
     return status;
 }
