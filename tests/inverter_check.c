@@ -9,9 +9,9 @@
 #include "../Core/Src/oled.c"
 
 GPIO_TypeDef test_gpio_a, test_gpio_b, test_gpio_d, test_gpio_e;
-TIM_TypeDef test_tim1, test_tim5;
+TIM_TypeDef test_tim8, test_tim5;
 RCC_TypeDef test_rcc;
-TIM_HandleTypeDef htim1 = {TIM1}, htim5 = {TIM5};
+TIM_HandleTypeDef htim8 = {TIM8}, htim5 = {TIM5};
 ADC_TypeDef test_adc;
 ADC_HandleTypeDef hadc1 = {ADC1};
 SPI_HandleTypeDef hspi2;
@@ -86,15 +86,15 @@ HAL_StatusTypeDef HAL_SPI_Transmit(SPI_HandleTypeDef *handle, uint8_t *data, uin
 static void CheckControl(void)
 {
     uint32_t duties[3][INV_SAMP_NUMBER];
-    RCC->APB2ENR = RCC_APB2ENR_TIM1EN;
+    RCC->APB2ENR = RCC_APB2ENR_TIM8EN;
     RCC->AHB2ENR = RCC_AHB2ENR_GPIOAEN | RCC_AHB2ENR_GPIOBEN;
-    TIM1->ARR = INV_PERIOD;
-    TIM1->BDTR = 5U;
+    TIM8->ARR = INV_PERIOD;
+    TIM8->BDTR = 5U;
     assert(INV_Init() == HAL_OK);
-    assert(!INV_PwmFlag && !(TIM1->BDTR & TIM_BDTR_MOE));
-    assert((TIM1->BDTR & 255U) == 5U);
+    assert(!INV_PwmFlag && !(TIM8->BDTR & TIM_BDTR_MOE));
+    assert((TIM8->BDTR & 255U) == 5U);
     assert(TIM5->ARR == 888U);
-    assert(TIM1->CR1 & TIM_CR1_CEN);
+    assert(TIM8->CR1 & TIM_CR1_CEN);
     assert(TIM5->DIER & TIM_IT_UPDATE);
 
     INV_SetFrequency(INT32_MAX);
@@ -104,7 +104,7 @@ static void CheckControl(void)
     INV_SetAmplitude(INT32_MAX);
     assert(INV_Amp == INV_AMP_MAX);
     INV_OutputEnable();
-    assert(INV_PwmFlag && (TIM1->BDTR & TIM_BDTR_MOE));
+    assert(INV_PwmFlag && (TIM8->BDTR & TIM_BDTR_MOE));
     assert(GPIOA->ODR & PWM_EN_Pin);
     assert(!(GPIOA->ODR & INV_OFFLINE_Pin));
     assert(GPIOB->ODR & RS_CTRL_Pin);
@@ -114,7 +114,7 @@ static void CheckControl(void)
         HAL_TIM_PeriodElapsedCallback(&htim5);
         for (uint32_t ch = 0; ch < 3U; ch++)
         {
-            duties[ch][i] = TIM1->compare[ch];
+            duties[ch][i] = TIM8->compare[ch];
             assert(duties[ch][i] <= INV_PERIOD);
         }
     }
@@ -144,21 +144,21 @@ static void CheckControl(void)
     HAL_TIM_PeriodElapsedCallback(&htim5);
     uint32_t minimum_amp_counts = INV_PERIOD * INV_AMP_MIN / 200U;
     for (uint32_t ch = 0; ch < 3U; ch++)
-        assert(TIM1->compare[ch] >= INV_PERIOD / 2 - minimum_amp_counts &&
-               TIM1->compare[ch] <= INV_PERIOD / 2 + minimum_amp_counts);
+        assert(TIM8->compare[ch] >= INV_PERIOD / 2 - minimum_amp_counts &&
+               TIM8->compare[ch] <= INV_PERIOD / 2 + minimum_amp_counts);
     test_primask = 1U;
     INV_OutputDisable();
-    assert(test_primask == 1U && !INV_PwmFlag && !(TIM1->BDTR & TIM_BDTR_MOE));
+    assert(test_primask == 1U && !INV_PwmFlag && !(TIM8->BDTR & TIM_BDTR_MOE));
     assert(GPIOA->BSRR == ((uint32_t)PWM_EN_Pin << 16U | INV_OFFLINE_Pin));
     assert(GPIOB->BSRR == (uint32_t)RS_CTRL_Pin << 16U);
     test_primask = 0U;
     INV_SetAmplitude(50);
     HAL_TIM_PeriodElapsedCallback(&htim5);
-    for (uint32_t ch = 0; ch < 3U; ch++) assert(TIM1->compare[ch] == INV_PERIOD / 2);
-    SET_BIT(TIM1->CR1, TIM_CR1_UDIS);
+    for (uint32_t ch = 0; ch < 3U; ch++) assert(TIM8->compare[ch] == INV_PERIOD / 2);
+    SET_BIT(TIM8->CR1, TIM_CR1_UDIS);
     Bipolar_pwm();
-    assert(TIM1->CR1 & TIM_CR1_UDIS);
-    CLEAR_BIT(TIM1->CR1, TIM_CR1_UDIS);
+    assert(TIM8->CR1 & TIM_CR1_UDIS);
+    CLEAR_BIT(TIM8->CR1, TIM_CR1_UDIS);
 }
 
 static void CheckVoltageControl(void)
@@ -244,6 +244,7 @@ static void CheckVoltageControl(void)
     test_tick = 0U;
     INV_SetLoopEnable(1);          /* 复位并记录 PI 节拍基准 */
     INV_SetTargetVoltage(20.0f);
+    INV_SetVoltageGains(1.0f, 1.0f);
     INV_SetFeedbackChannel(0);
     assert(INV_GetLoopState() == INV_LOOP_WAIT);
     for (uint32_t i = 0; i < INV_RMS_WINDOW_SIZE; i++)
@@ -251,7 +252,7 @@ static void CheckVoltageControl(void)
     assert(INV_GetLoopState() == INV_LOOP_READY);
     test_tick += 10U;
     INV_VoltageControlTick(10.0f);
-    assert(INV_Amp == 77); /* 50 + Kp*10 + Ki*10*0.01，增益取宏值 2/70 */
+    assert(INV_Amp == 60); /* 50 + Kp*10 + Ki*10*0.01 */
     INV_PwmFlag = 0;
     INV_SetLoopEnable(0);
     INV_SetTargetVoltage(0.0f);
@@ -336,54 +337,52 @@ static void CheckSampling(void)
     INV_SamplingStop();
 }
 
-static void RunMenuKeys(const char *keys)
-{
-    test_keys = keys;
-    while (*test_keys != '\0')
-        INV_Menu_TickISR();
-}
-
 static void CheckMenu(void)
 {
     INV_SetFrequency(50);
     INV_SetAmplitude(10);
     INV_SetTargetVoltage(0.0f);
     INV_SetLoopEnable(0);
+    INV_SetVoltageGains(INV_VOLTAGE_KP_DEFAULT, INV_VOLTAGE_KI_DEFAULT);
     INV_SetFeedbackChannel(0);
     INV_OutputEnable();
     assert(INV_PwmFlag);
 
-    INV_Menu_Init();
-    assert(INV_Menu_TakeUpdate() == 1U);
-    assert(INV_Menu_TakeUpdate() == 0U);
-
-    /* D 进入菜单，6 三次 50 -> 53，D 退出；进入时输出关闭。 */
-    RunMenuKeys("D666D");
+    /* FREQ 项：6 三次 50 -> 53；退出菜单时输出已关闭。 */
+    test_keys = "666D";
+    INV_Menu_Run();
     assert(INV_Freq == 53 && !INV_PwmFlag);
 
     /* TGT ±0.5V 与开环 AMP 手动调整。 */
-    RunMenuKeys("D866866D");
+    test_keys = "866866D";
+    INV_Menu_Run();
     assert(INV_TargetVoltage == 1.0f && INV_Amp == 12);
 
-    /* LOOP 使能、FB 切到 V2；Kp/Ki 不再出现在菜单里。 */
-    RunMenuKeys("D888686D");
+    /* LOOP 使能、KP +0.01、KI +0.1、FB 切到 V2。 */
+    test_keys = "8886868686D";
+    INV_Menu_Run();
     assert(INV_LoopEnable == 1 && INV_FeedbackChannel == 1);
+    assert(fabsf(INV_VoltageKp - 2.01f) < 0.0001f);
+    assert(fabsf(INV_VoltageKi - 20.1f) < 0.001f);
 
     /* 闭环下 AMP 手动调整被拒绝。 */
-    RunMenuKeys("D8866D");
+    test_keys = "8866D";
+    INV_Menu_Run();
     assert(INV_Amp == 12);
 
     /* 目标电压下限钳位到 0，进入 SETUP 后禁止开输出。 */
-    RunMenuKeys("D84444D");
+    test_keys = "84444D";
+    INV_Menu_Run();
     assert(INV_TargetVoltage == 0.0f);
     INV_OutputEnable();
     assert(!INV_PwmFlag);
 
     /* 2 键反向循环。 */
-    RunMenuKeys("D22D");
+    test_keys = "22D";
+    INV_Menu_Run();
     INV_SetLoopEnable(0);
     INV_SetFeedbackChannel(0);
-    INV_Menu_Draw();
+    INV_ShowStandby();
 }
 
 static void CheckOled(void)

@@ -4,13 +4,14 @@
 #include <math.h>
 
 extern TIM_HandleTypeDef htim5;
-extern TIM_HandleTypeDef htim1;
 
 volatile int32_t INV_Freq = INV_FREQ_DEFAULT;
 volatile int32_t INV_Amp = INV_AMP_DEFAULT;
 volatile int32_t INV_PwmFlag;
 volatile int32_t INV_LoopEnable;
 volatile int32_t INV_FeedbackChannel;
+volatile float INV_VoltageKp = INV_VOLTAGE_KP_DEFAULT;
+volatile float INV_VoltageKi = INV_VOLTAGE_KI_DEFAULT;
 volatile float INV_TargetVoltage = 0.0f;
 volatile float INV_Vrms = -1.0f;
 
@@ -51,7 +52,7 @@ uint32_t INV_GetLoopState(void)
 {
     if (!INV_LoopEnable) return INV_LOOP_OPEN;
     if (INV_TargetVoltage <= 0.0f ||
-        (INV_VOLTAGE_KP == 0.0f && INV_VOLTAGE_KI == 0.0f))
+        (INV_VoltageKp == 0.0f && INV_VoltageKi == 0.0f))
         return INV_LOOP_SETUP;
     return INV_Vrms < 0.0f ? INV_LOOP_WAIT : INV_LOOP_READY;
 }
@@ -71,6 +72,17 @@ void INV_SetFeedbackChannel(int32_t channel)
     uint32_t primask = __get_PRIMASK();
     __disable_irq();
     INV_FeedbackChannel = channel;
+    ResetVoltageControl();
+    __set_PRIMASK(primask);
+}
+
+void INV_SetVoltageGains(float kp, float ki)
+{
+    if (kp < 0.0f || ki < 0.0f || kp > 9.99f || ki > 99.9f) return;
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+    INV_VoltageKp = kp;
+    INV_VoltageKi = ki;
     ResetVoltageControl();
     __set_PRIMASK(primask);
 }
@@ -107,8 +119,8 @@ void INV_VoltageControlTick(float voltage)
     if (elapsed >= 1U)
     {
         voltage_pi_tick = now;
-        INV_VoltagePI(INV_TargetVoltage, INV_Vrms, INV_VOLTAGE_KP,
-                      INV_VOLTAGE_KI, (float)elapsed * 0.001f);
+        INV_VoltagePI(INV_TargetVoltage, INV_Vrms, INV_VoltageKp,
+                      INV_VoltageKi, (float)elapsed * 0.001f);
     }
 }
 
@@ -215,8 +227,8 @@ void INV_OutputEnable(void)
     /* 先装入目标占空比，再开启输出。 */
     INV_PwmFlag = 1;
     Bipolar_pwm();
-    TIM1->EGR = TIM_EGR_UG;
-    SET_BIT(TIM1->BDTR, TIM_BDTR_MOE);
+    TIM8->EGR = TIM_EGR_UG;
+    SET_BIT(TIM8->BDTR, TIM_BDTR_MOE);
     HAL_GPIO_WritePin(INV_OFFLINE_GPIO_Port, INV_OFFLINE_Pin, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(RS_CTRL_GPIO_Port, RS_CTRL_Pin, GPIO_PIN_SET);
     HAL_GPIO_WritePin(PWM_EN_GPIO_Port, PWM_EN_Pin, GPIO_PIN_SET);
@@ -228,8 +240,8 @@ void INV_OutputDisable(void)
     uint32_t primask = __get_PRIMASK();
     __disable_irq();
     /* 错误入口可能在外设初始化前调用，未开时钟时不访问寄存器。 */
-    if ((RCC->APB2ENR & RCC_APB2ENR_TIM1EN) != 0U)
-        CLEAR_BIT(TIM1->BDTR, TIM_BDTR_MOE);
+    if ((RCC->APB2ENR & RCC_APB2ENR_TIM8EN) != 0U)
+        CLEAR_BIT(TIM8->BDTR, TIM_BDTR_MOE);
     if ((RCC->AHB2ENR & RCC_AHB2ENR_GPIOAEN) != 0U)
         GPIOA->BSRR = ((uint32_t)PWM_EN_Pin << 16U) | INV_OFFLINE_Pin;
     if ((RCC->AHB2ENR & RCC_AHB2ENR_GPIOBEN) != 0U)
