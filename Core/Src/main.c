@@ -23,10 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "oled.h"
 #include "Keyboard.h"
-#include "Bipolar_PWM.h"
-#include "inverter_control_tools.h"
-#include "inverter_menu.h"
-#include "inverter_sampling.h"
+#include "sampling.h"
 
 /* USER CODE END Includes */
 
@@ -83,8 +80,6 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-  char key;
-  uint32_t standby_tick = 0U;
 
   /* USER CODE END 1 */
 
@@ -116,9 +111,9 @@ int main(void)
   OLED_Init();
   Keyboard_Init();
 
-  /* 先校准并就绪 ADC DMA，再启动 TIM8 触发和调制，保持输出关闭。 */
+  /* 先校准并就绪 ADC DMA，再启动 TIM8 触发；输出保持关闭。 */
   if (INV_SamplingStart() != HAL_OK) Error_Handler();
-  if (INV_Init() != HAL_OK) Error_Handler();
+  if (HAL_TIM_Base_Start(&htim8) != HAL_OK) Error_Handler();
 
   /* 欢迎界面（替代原工程 gImage_welcome 开机图） */
   OLED_Clear();
@@ -126,9 +121,6 @@ int main(void)
   OLED_ShowString(16, 32, "G474 PORT", 16);
   OLED_Refresh();
   HAL_Delay(2000);
-
-  INV_ShowStandby();
-  standby_tick = HAL_GetTick();
 
   /* USER CODE END 2 */
 
@@ -139,32 +131,6 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    key = Keyboard_GetKey();
-    if (key == 'A')                 /* 功率输出开关 */
-    {
-      if (INV_PwmFlag) INV_OutputDisable();
-      else             INV_OutputEnable();
-      INV_ShowStandby();
-      standby_tick = HAL_GetTick();
-    }
-    else if (key == 'C')
-    {
-      INV_OutputDisable();
-      INV_ShowStandby();
-    }
-    else if (key == 'D')            /* 进入参数菜单 */
-    {
-      INV_Menu_Run();
-      INV_ShowStandby();
-      standby_tick = HAL_GetTick();
-    }
-
-    /* 定时刷新输出命令和频率、幅度。 */
-    if (HAL_GetTick() - standby_tick >= 200U)
-    {
-      standby_tick = HAL_GetTick();
-      INV_ShowStandby();
-    }
   }
   /* USER CODE END 3 */
 }
@@ -580,7 +546,8 @@ void Keyboard_TickISR(void)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  INV_OutputDisable();
+  __HAL_TIM_MOE_DISABLE(&htim8);
+  HAL_GPIO_WritePin(PWM_EN_GPIO_Port, PWM_EN_Pin, GPIO_PIN_RESET);
   /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
   while (1)

@@ -22,7 +22,6 @@
 #include "stm32g4xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "inverter_control_tools.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -60,7 +59,7 @@ extern DMA_HandleTypeDef hdma_adc1;
 extern ADC_HandleTypeDef hadc1;
 extern TIM_HandleTypeDef htim5;
 /* USER CODE BEGIN EV */
-extern TIM_HandleTypeDef htim5;
+extern TIM_HandleTypeDef htim8;
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -72,7 +71,8 @@ extern TIM_HandleTypeDef htim5;
 void NMI_Handler(void)
 {
   /* USER CODE BEGIN NonMaskableInt_IRQn 0 */
-  INV_OutputDisable();
+  __HAL_TIM_MOE_DISABLE(&htim8);
+  HAL_GPIO_WritePin(PWM_EN_GPIO_Port, PWM_EN_Pin, GPIO_PIN_RESET);
   __disable_irq();
 
   /* USER CODE END NonMaskableInt_IRQn 0 */
@@ -89,7 +89,8 @@ void NMI_Handler(void)
 void HardFault_Handler(void)
 {
   /* USER CODE BEGIN HardFault_IRQn 0 */
-  INV_OutputDisable();
+  __HAL_TIM_MOE_DISABLE(&htim8);
+  HAL_GPIO_WritePin(PWM_EN_GPIO_Port, PWM_EN_Pin, GPIO_PIN_RESET);
   __disable_irq();
 
   /* USER CODE END HardFault_IRQn 0 */
@@ -106,7 +107,8 @@ void HardFault_Handler(void)
 void MemManage_Handler(void)
 {
   /* USER CODE BEGIN MemoryManagement_IRQn 0 */
-  INV_OutputDisable();
+  __HAL_TIM_MOE_DISABLE(&htim8);
+  HAL_GPIO_WritePin(PWM_EN_GPIO_Port, PWM_EN_Pin, GPIO_PIN_RESET);
   __disable_irq();
 
   /* USER CODE END MemoryManagement_IRQn 0 */
@@ -123,7 +125,8 @@ void MemManage_Handler(void)
 void BusFault_Handler(void)
 {
   /* USER CODE BEGIN BusFault_IRQn 0 */
-  INV_OutputDisable();
+  __HAL_TIM_MOE_DISABLE(&htim8);
+  HAL_GPIO_WritePin(PWM_EN_GPIO_Port, PWM_EN_Pin, GPIO_PIN_RESET);
   __disable_irq();
 
   /* USER CODE END BusFault_IRQn 0 */
@@ -140,7 +143,8 @@ void BusFault_Handler(void)
 void UsageFault_Handler(void)
 {
   /* USER CODE BEGIN UsageFault_IRQn 0 */
-  INV_OutputDisable();
+  __HAL_TIM_MOE_DISABLE(&htim8);
+  HAL_GPIO_WritePin(PWM_EN_GPIO_Port, PWM_EN_Pin, GPIO_PIN_RESET);
   __disable_irq();
 
   /* USER CODE END UsageFault_IRQn 0 */

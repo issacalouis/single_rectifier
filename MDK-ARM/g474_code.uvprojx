@@ -403,24 +403,9 @@
               <FilePath>../Core/Src/Keyboard.c</FilePath>
             </File>
             <File>
-              <FileName>Bipolar_PWM.c</FileName>
+              <FileName>sampling.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../Core/Src/Bipolar_PWM.c</FilePath>
-            </File>
-            <File>
-              <FileName>inverter_menu.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>../Core/Src/inverter_menu.c</FilePath>
-            </File>
-            <File>
-              <FileName>inverter_control_tools.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>../Core/Src/inverter_control_tools.c</FilePath>
-            </File>
-            <File>
-              <FileName>inverter_sampling.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>../Core/Src/inverter_sampling.c</FilePath>
+              <FilePath>../Core/Src/sampling.c</FilePath>
             </File>
             <File>
               <FileName>main.c</FileName>
