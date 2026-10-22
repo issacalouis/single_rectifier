@@ -68,14 +68,13 @@ static void SamplingProcessFrame(const volatile uint16_t *raw)
     sampling_data.sequence++;
     if (sampling_data.offset_valid != 0U)
     {
-        if (SingleRectifier_ControlStep(sampling_data.ac[INV_SAMPLE_VOLTAGE1],
-                                        sampling_data.ac[INV_SAMPLE_CURRENT]) != 0U)
+        if (SingleRectifier_ControlStep(sampling_data.ac[INV_SAMPLE_VOLTAGE1]) != 0U)
             INV_SamplingNotifyCycle();
     }
     else
     {
         /* 偏置未就绪时也推进锁相环，用开环过零点建立采样窗口。 */
-        if (SingleRectifier_ControlStep(0.0f, 0.0f) != 0U)
+        if (SingleRectifier_ControlStep(0.0f) != 0U)
             INV_SamplingNotifyCycle();
     }
 }
