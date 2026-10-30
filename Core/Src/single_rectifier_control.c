@@ -3,6 +3,7 @@
 #include <math.h>
 
 #include "single_rectifier_control_private.h"
+#include "arm_math.h"
 
 static float SingleRectifier_TableLookup(float pos)
 {
@@ -55,7 +56,7 @@ uint32_t SingleRectifier_ControlStep(float v1)
     error = v1 - sr_pll.x1;
     sr_pll.x1 += SR_SAMPLE_PERIOD_S * SR_GRID_OMEGA * (SR_SOGI_K * error - sr_pll.x2);
     sr_pll.x2 += SR_SAMPLE_PERIOD_S * SR_GRID_OMEGA * sr_pll.x1;
-    peak = sqrtf(sr_pll.x1 * sr_pll.x1 + sr_pll.x2 * sr_pll.x2);
+    peak = arm_sqrt_f32(sr_pll.x1 * sr_pll.x1 + sr_pll.x2 * sr_pll.x2);
 
     SingleRectifier_SinCos(sr_state.theta, &sin_theta, &cos_theta);
     phase_error = (sr_pll.x1 * cos_theta + sr_pll.x2 * sin_theta) / (peak + SR_PLL_PEAK_EPS);
@@ -77,3 +78,4 @@ void SingleRectifier_GetState(SingleRectifier_ControlState *state)
 {
     *state = sr_state;
 }
+
