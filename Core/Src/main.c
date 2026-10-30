@@ -24,6 +24,8 @@
 #include "oled.h"
 #include "Keyboard.h"
 #include "sampling.h"
+#include "Control_Tools.h"
+
 
 /* USER CODE END Includes */
 
@@ -536,7 +538,18 @@ void Keyboard_TickISR(void)
 {
   Keyboard_ScanISR();
 }
-
+/*
+以下为由TIM5控制的电压环、电流环及PWM指令计算的主控制环。
+目前已经实现：
+1.
+*/
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+    if (htim->Instance == TIM5)
+    {
+        //ControlLoop_Step();  /* 你的电压环、电流环及 PWM 指令计算 */
+    }
+}
 /* USER CODE END 4 */
 
 /**
