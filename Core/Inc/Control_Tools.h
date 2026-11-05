@@ -26,18 +26,23 @@ typedef struct {
     float u_prev1, u_prev2;
     float y_prev1, y_prev2;
     float b0, b1, b2, a1, a2;
-    float kp,kr,T,Wc,W0;
+    float kp,kr,T;
+    float Wc; /* 谐振带宽参数，rad/s */
+    float W0; /* 谐振中心角频率，rad/s */
     float out_limit;
 } PR_Controller;
 //---------------------增量式PI------------------------//
-void PI_Delta_Init(PI_Controller *Pi, float min, float max, float kp, float ki);
+/* kp、ki 为离散增益；min、max 为增量限幅。 */
+void PI_Delta_Init(PI_Controller *Pi, float kp, float ki, float min, float max);
 void PI_Delta_Cal(PI_Controller *Pi, float Pi_in);
 //---------------------位置式PI------------------------//
-void PI_Pos_Init(PI_Controller *Pi, float min, float max, float kp, float ki);
+/* kp、ki 为离散增益；min、max 为输出及积分限幅。 */
+void PI_Pos_Init(PI_Controller *Pi, float kp, float ki, float min, float max);
 void PI_Pos_Cal(PI_Controller *Pi, float error);
 //---------------------PR函数------------------------//
+/* T 为调用周期(s)，Wc 为带宽参数(rad/s)，W0=2*pi*f0 为中心角频率(rad/s)。 */
 void PR_Init(PR_Controller* ctrl, float T, float Kp, float Kr,
-		float Wc, float W0, float out_limit);
+             float Wc, float W0, float out_limit);
 void PR_Cal(PR_Controller* ctrl, float input, float gain) ;
 //---------------------Clark变换函数------------------------//
 void Clarke_F(float Ua, float Ub, float Uc, float *Ualpha, float *Ubeta);

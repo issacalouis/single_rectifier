@@ -75,7 +75,8 @@ void PI_Pos_Cal(PI_Controller *Pi, float error)
 }
 //----------------------------------------------------------PR------------------------------------------------------//
 /**
- * PR谐振滤波初始化（T为周期，wc是中心频率，w0是带宽，中心频率是对应频率乘2pi，w0是带宽，一般比较小）
+ * 准PR初始化：T为调用周期(s)，Wc为带宽参数(rad/s)，W0为中心角频率(rad/s)。
+ * G(s) = Kp + 2*Kr*Wc*s / (s*s + 2*Wc*s + W0*W0)，采用双线性变换。
  */
 void PR_Init(PR_Controller* ctrl, float T, float Kp, float Kr,float Wc, float W0, float out_limit) {
     float a0 = (4.0f / (T * T)) + (4.0f * Wc / T) + W0 * W0;
