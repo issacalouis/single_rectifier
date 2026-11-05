@@ -25,7 +25,6 @@
 #include "Keyboard.h"
 #include "sampling.h"
 #include "Control_Tools.h"
-#include "arm_math.h"
 
 
 
@@ -68,17 +67,6 @@ INV_SamplingData realdata; // 采样处理后的真实数据
 // 变量定义
 static uint16_t clock_timer = 0; //控制环定时器
 uint16_t circle_n = 0; //用于描述控制环在工频周期的位置
-// 以下变量用于有效值平均值计算
-float Uac_sum = 0.0f;
-float Iac_sum = 0.0f;
-float Udc_sum = 0.0f;
-float Uac_square_sum = 0.0f;
-float Iac_square_sum = 0.0f;
-float Uac_rms = 0.0f;
-float Iac_rms = 0.0f;
-float Udc_mean = 0.0f;
-float Uac_mean = 0.0f;
-float Iac_mean = 0.0f;
 
 // ===========================================================================
 /* USER CODE END PV */
@@ -405,7 +393,7 @@ static void MX_TIM8_Init(void)
   htim8.Init.CounterMode = TIM_COUNTERMODE_CENTERALIGNED1;
   htim8.Init.Period = 800;
   htim8.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim8.Init.RepetitionCounter = 0;
+  htim8.Init.RepetitionCounter = 1;
   htim8.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim8) != HAL_OK)
   {
@@ -569,8 +557,6 @@ void Keyboard_TickISR(void)
 }
 /*
 以下为由TIM5控制的电压环、电流环及PWM指令计算的主控制环。
-目前已经实现：
-1.有效值平均值计算
 */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
@@ -579,31 +565,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
       clock_timer = (clock_timer + 1) % (uint16_t)(CLK_FREQ);
       circle_n = clock_timer%SAMPLE_POINT;
       INV_SamplingGetData(&realdata);
-      //============================================================
-      // 1. 有效值平均值处理
-      Uac_sum+=realdata.ac[INV_SAMPLE_VOLTAGE1];
-      Iac_sum+=realdata.ac[INV_SAMPLE_CURRENT];
-      Udc_sum+=realdata.value[INV_SAMPLE_VOLTAGE2];
-      Uac_square_sum+=realdata.ac[INV_SAMPLE_VOLTAGE1]*realdata.ac[INV_SAMPLE_VOLTAGE1];
-      Iac_square_sum+=realdata.ac[INV_SAMPLE_CURRENT]*realdata.ac[INV_SAMPLE_CURRENT];
-
-   
-      if(circle_n == 0)
-      {
-        // 平均值
-        Uac_mean = Uac_sum/SAMPLE_POINT;
-        Iac_mean = Iac_sum/SAMPLE_POINT;
-        Udc_mean = Udc_sum/SAMPLE_POINT;
-        // 有效值
-        arm_sqrt_f32(Uac_square_sum/SAMPLE_POINT,&Uac_rms);
-        arm_sqrt_f32(Iac_square_sum/SAMPLE_POINT,&Iac_rms);
-        // 更新
-        Uac_sum = 0.0f;
-        Iac_sum = 0.0f;
-        Udc_sum = 0.0f;
-        Uac_square_sum = 0.0f;
-        Iac_square_sum = 0.0f;
-      }
 
     }
 }

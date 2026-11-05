@@ -4,8 +4,9 @@
 #include "single_rectifier_control.h"
 
 /* 采样帧率 = TIM8 触发 ADC 的频率：16 MHz、中心对齐 ARR=800，载波 10 kHz，
- * 每个载波周期上溢、下溢各触发一次。改时钟树或定时器后同步修改。 */
-#define SR_SAMPLE_RATE_HZ    20000.0f
+ * RCR=1，每两个计数边界产生一次更新，每个载波周期触发一次采样。
+ * 改时钟树或定时器后同步修改。 */
+#define SR_SAMPLE_RATE_HZ    10000.0f
 #define SR_SAMPLE_PERIOD_S   (1.0f / SR_SAMPLE_RATE_HZ)
 
 #define TWO_PI            6.28318530717958f
