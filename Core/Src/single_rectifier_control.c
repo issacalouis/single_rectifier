@@ -39,6 +39,8 @@ void SingleRectifier_ControlReset(void)
     sr_state.theta = 0.0f;
     sr_state.frequency = SR_GRID_FREQ_HZ;
     sr_state.PLL_done = 0U;
+    sr_state.U_source_d = 0.0f;
+    sr_state.U_source_q = 0.0f;
 }
 
 uint32_t SingleRectifier_ControlStep(float v1)
@@ -61,8 +63,9 @@ uint32_t SingleRectifier_ControlStep(float v1)
     peak = sqrtf(sr_pll.x1 * sr_pll.x1 + sr_pll.x2 * sr_pll.x2);
 
     SingleRectifier_SinCos(sr_state.theta, &sin_theta, &cos_theta);
-    Uq = sr_pll.x1 * cos_theta + sr_pll.x2 * sin_theta;
-    phase_error = Uq / (peak + SR_PLL_PEAK_EPS);
+    sr_state.U_source_d = sr_pll.x1 * sin_theta - sr_pll.x2 * cos_theta;
+    sr_state.U_source_q = sr_pll.x1 * cos_theta + sr_pll.x2 * sin_theta;
+    phase_error = sr_state.U_source_q / (peak + SR_PLL_PEAK_EPS);
     // phase_error = (sr_pll.x1 * cos_theta + sr_pll.x2 * sin_theta) / (peak + SR_PLL_PEAK_EPS);
 
     sr_pll.integral += SR_PLL_KI * phase_error * SR_SAMPLE_PERIOD_S;
@@ -70,7 +73,7 @@ uint32_t SingleRectifier_ControlStep(float v1)
 
     sr_state.frequency = omega / TWO_PI;
     sr_state.theta += omega * SR_SAMPLE_PERIOD_S;
-    if(Uq < 1.0f && Uq > -1.0f)
+    if(sr_state.U_source_d < 1.0f && sr_state.U_source_q > -1.0f)
     {
         sr_pll.PLL_done_counter++;
         if(sr_pll.PLL_done_counter >= 200)

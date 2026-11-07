@@ -26,7 +26,7 @@
 #include "sampling.h"
 #include "Control_Tools.h"
 #include "arm_math.h"
-
+#include "single_rectifier_control.h"
 
 
 /* USER CODE END Includes */
@@ -44,6 +44,18 @@
 #define AC_Freq 50
 #define SQRT_2 1.41421356237f
 #define Wc (2*3.14159265359*AC_Freq)
+
+// PI控制器的相关参数
+#define Udc_Kp 0.1f // Udc环Kp
+#define Udc_Ki 0.01f // Udc环Ki
+#define Id_Kp 0.1f // 直轴分量Id环Kp
+#define Id_Ki 0.01f // 直轴分量Id环Ki
+#define Iq_Kp 0.1f // 交轴分量Iq环Kp
+#define Iq_Ki 0.01f // 交轴分量Iq环Ki
+// PI控制器的限幅参数
+
+
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -78,6 +90,15 @@ float Iac_rms = 0.0f;
 float Udc_mean = 0.0f;
 float Uac_mean = 0.0f;
 float Iac_mean = 0.0f;
+// ===========================================================================
+// PI控制器
+PI_Controller Udc_loop; // Udc环
+PI_Controller Id_loop; // 直轴分量Id环
+PI_Controller Iq_loop; // 交轴分量Iq环
+float Udc_ref = 32; // 直流电压输出参考值
+
+float Id_ref = 0.0f; // 直轴分量Id参考值
+float Iq_ref = 0.0f; // 交轴分量Iq参考值
 
 // ===========================================================================
 /* USER CODE END PV */
@@ -97,7 +118,14 @@ static void MX_TIM1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+void Control_Init(void)
+{
+  //初始化PI控制器，主要完成三个控制环的初始化，分别为直流电压外环PI控制器，直轴分量Id环PI控制器，交轴分量Iq环PI控制器
+  PI_Pos_Init(&Udc_loop, Udc_Kp, Udc_Ki, -1.0f, 1.0f);
+  PI_Pos_Init(&Id_loop, Id_Kp, Id_Ki, -1.0f, 1.0f);
+  PI_Pos_Init(&Iq_loop, Iq_Kp, Iq_Ki, -1.0f, 1.0f);
+  // 注意PI控制器的 PI_Pos_Init 函数中，最后两个参数是积分器加和值的最小值和最大值，不是PI控制器输出的最小值与最大值
+}
 /* USER CODE END 0 */
 
 /**
@@ -139,6 +167,7 @@ int main(void)
 
   OLED_Init();
   Keyboard_Init();
+  Control_Init();
 
   /* 先校准并就绪 ADC DMA，再启动 TIM8 触发；输出保持关闭。 */
   if (INV_SamplingStart() != HAL_OK) Error_Handler();
@@ -665,6 +694,9 @@ void Keyboard_TickISR(void)
 }
 /*
 以下为由TIM5控制的电压环、电流环及PWM指令计算的主控制环。
+目前已经实现
+1. 平均值有效值计算
+2. 电压外环
 */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
@@ -694,6 +726,17 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
         Uac_square_sum = 0.0f;
         Iac_square_sum = 0.0f;
       }
+      //============================================================
+      // 2. 电压外环
+      float Udc_error = Udc_ref - Udc_mean;
+      PI_Pos_Cal(&Udc_loop, Udc_error);
+      saturation(&Udc_loop, -1.0f, 1.0f);// 直流电压环输出限幅 
+      Id_ref = Udc_loop.Pos; // 直流电压环输出作为Id参考值
+      Iq_ref = 0.0f; // 控制交轴分量Iq为0，实现功率因数为1的控制
+      //============================================================
+
+
+
 
     }
 }

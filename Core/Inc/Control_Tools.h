@@ -47,5 +47,6 @@ void PR_Cal(PR_Controller* ctrl, float input, float gain) ;
 //---------------------Clark变换函数------------------------//
 void Clarke_F(float Ua, float Ub, float Uc, float *Ualpha, float *Ubeta);
 //void inv_Clarke_F(float Udc, float Ualpha, float Ubeta, float *w1, float *w2, float *w3);
-
+//---------------------限幅函数------------------------//
+float saturation(float *value, float min, float max);
 #endif /* CONTROL_TOOLS_H_ */

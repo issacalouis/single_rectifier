@@ -10,6 +10,8 @@ typedef struct
     float theta;     /* 电网电压相位，rad，0 约对应电压正弦正向过零 */
     float frequency; /* PLL 估计的电网频率，Hz */
     uint8_t PLL_done; /* PLL 锁定标志，0 未锁定，1 锁定 */
+    float U_source_d; //电网侧d轴分量
+    float U_source_q; //电网侧q轴分量
 } SingleRectifier_ControlState;
 
 /* 重新采样或上电时调用，清除 PLL 状态。 */

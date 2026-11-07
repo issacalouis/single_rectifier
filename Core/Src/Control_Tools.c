@@ -143,3 +143,16 @@ void Clarke_F(float Ua, float Ub, float Uc, float *Ualpha, float *Ubeta)
 //     *w2 = k * (Udc - Ualpha + sqrtf(3.0f) * Ubeta);
 //     *w3 = k * (Udc - Ualpha - sqrtf(3.0f) * Ubeta);
 // }
+
+//  限幅函数
+void saturation(float *value, float min, float max)
+{
+    if (*value > max)
+    {
+        *value = max;
+    }
+    else if (*value < min)
+    {
+        *value = min;
+    }
+}
