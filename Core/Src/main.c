@@ -25,6 +25,7 @@
 #include "Keyboard.h"
 #include "sampling.h"
 #include "Control_Tools.h"
+#include "arm_math.h"
 
 
 
@@ -51,13 +52,12 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-
-
 ADC_HandleTypeDef hadc1;
 DMA_HandleTypeDef hdma_adc1;
 
 SPI_HandleTypeDef hspi2;
 
+TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim5;
 TIM_HandleTypeDef htim8;
 
@@ -67,6 +67,17 @@ INV_SamplingData realdata; // 采样处理后的真实数据
 // 变量定义
 static uint16_t clock_timer = 0; //控制环定时器
 uint16_t circle_n = 0; //用于描述控制环在工频周期的位置
+// 以下变量用于有效值平均值计算
+float Uac_sum = 0.0f;
+float Iac_sum = 0.0f;
+float Udc_sum = 0.0f;
+float Uac_square_sum = 0.0f;
+float Iac_square_sum = 0.0f;
+float Uac_rms = 0.0f;
+float Iac_rms = 0.0f;
+float Udc_mean = 0.0f;
+float Uac_mean = 0.0f;
+float Iac_mean = 0.0f;
 
 // ===========================================================================
 /* USER CODE END PV */
@@ -79,6 +90,7 @@ static void MX_ADC1_Init(void);
 static void MX_TIM5_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_TIM8_Init(void);
+static void MX_TIM1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -122,6 +134,7 @@ int main(void)
   MX_TIM5_Init();
   MX_SPI2_Init();
   MX_TIM8_Init();
+  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
 
   OLED_Init();
@@ -140,6 +153,15 @@ int main(void)
 
   // TIM5 启动
   HAL_TIM_Base_Start_IT(&htim5);
+  // 单相PWM整流使用TIM1的PWM输出,分别打开TIM1的两个通道及其互补输出
+  // TIM1 CH1 CH1N分别对应PE9 PC13
+  // TIM1 CH2 CH2N分别对应PE11 PB0
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+  HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
+  HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_2);
+  
+  //
 
   /* USER CODE END 2 */
 
@@ -320,6 +342,92 @@ static void MX_SPI2_Init(void)
   /* USER CODE BEGIN SPI2_Init 2 */
 
   /* USER CODE END SPI2_Init 2 */
+
+}
+
+/**
+  * @brief TIM1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM1_Init(void)
+{
+
+  /* USER CODE BEGIN TIM1_Init 0 */
+
+  /* USER CODE END TIM1_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+  TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
+
+  /* USER CODE BEGIN TIM1_Init 1 */
+
+  /* USER CODE END TIM1_Init 1 */
+  htim1.Instance = TIM1;
+  htim1.Init.Prescaler = 0;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_CENTERALIGNED1;
+  htim1.Init.Period = 800;
+  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim1.Init.RepetitionCounter = 1;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
+  sMasterConfig.MasterOutputTrigger2 = TIM_TRGO2_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 400;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
+  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
+  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_ENABLE;
+  sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_ENABLE;
+  sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
+  sBreakDeadTimeConfig.DeadTime = 5;
+  sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
+  sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
+  sBreakDeadTimeConfig.BreakFilter = 0;
+  sBreakDeadTimeConfig.BreakAFMode = TIM_BREAK_AFMODE_INPUT;
+  sBreakDeadTimeConfig.Break2State = TIM_BREAK2_DISABLE;
+  sBreakDeadTimeConfig.Break2Polarity = TIM_BREAK2POLARITY_HIGH;
+  sBreakDeadTimeConfig.Break2Filter = 0;
+  sBreakDeadTimeConfig.Break2AFMode = TIM_BREAK_AFMODE_INPUT;
+  sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
+  if (HAL_TIMEx_ConfigBreakDeadTime(&htim1, &sBreakDeadTimeConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM1_Init 2 */
+
+  /* USER CODE END TIM1_Init 2 */
+  HAL_TIM_MspPostInit(&htim1);
 
 }
 
@@ -565,6 +673,27 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
       clock_timer = (clock_timer + 1) % (uint16_t)(CLK_FREQ);
       circle_n = clock_timer%SAMPLE_POINT;
       INV_SamplingGetData(&realdata);
+      //============================================================
+      // 1. 有效值平均值处理
+      Uac_sum += realdata.ac[INV_SAMPLE_VOLTAGE1];
+      Iac_sum += realdata.ac[INV_SAMPLE_CURRENT];
+      Udc_sum += realdata.value[INV_SAMPLE_VOLTAGE2];
+      Uac_square_sum += realdata.ac[INV_SAMPLE_VOLTAGE1] * realdata.ac[INV_SAMPLE_VOLTAGE1];
+      Iac_square_sum += realdata.ac[INV_SAMPLE_CURRENT] * realdata.ac[INV_SAMPLE_CURRENT];
+
+      if (circle_n == 0)
+      {
+        Uac_mean = Uac_sum / SAMPLE_POINT;
+        Iac_mean = Iac_sum / SAMPLE_POINT;
+        Udc_mean = Udc_sum / SAMPLE_POINT;
+        arm_sqrt_f32(Uac_square_sum / SAMPLE_POINT, &Uac_rms);
+        arm_sqrt_f32(Iac_square_sum / SAMPLE_POINT, &Iac_rms);
+        Uac_sum = 0.0f;
+        Iac_sum = 0.0f;
+        Udc_sum = 0.0f;
+        Uac_square_sum = 0.0f;
+        Iac_square_sum = 0.0f;
+      }
 
     }
 }
