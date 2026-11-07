@@ -33,10 +33,12 @@ void SingleRectifier_ControlReset(void)
     sr_pll.x1 = 0.0f;
     sr_pll.x2 = 0.0f;
     sr_pll.integral = 0.0f;
+    sr_pll.PLL_done_counter = 0U;
 
     sr_state.v1 = 0.0f;
     sr_state.theta = 0.0f;
     sr_state.frequency = SR_GRID_FREQ_HZ;
+    sr_state.PLL_done = 0U;
 }
 
 uint32_t SingleRectifier_ControlStep(float v1)
@@ -47,6 +49,7 @@ uint32_t SingleRectifier_ControlStep(float v1)
     float sin_theta;
     float cos_theta;
     float phase_error;
+    float Uq; //计算电网SOGI后的q轴分量，用于判断锁相环是否成功
 
     sr_state.v1 = v1;
 
@@ -58,13 +61,37 @@ uint32_t SingleRectifier_ControlStep(float v1)
     peak = sqrtf(sr_pll.x1 * sr_pll.x1 + sr_pll.x2 * sr_pll.x2);
 
     SingleRectifier_SinCos(sr_state.theta, &sin_theta, &cos_theta);
-    phase_error = (sr_pll.x1 * cos_theta + sr_pll.x2 * sin_theta) / (peak + SR_PLL_PEAK_EPS);
+    Uq = sr_pll.x1 * cos_theta + sr_pll.x2 * sin_theta;
+    phase_error = Uq / (peak + SR_PLL_PEAK_EPS);
+    // phase_error = (sr_pll.x1 * cos_theta + sr_pll.x2 * sin_theta) / (peak + SR_PLL_PEAK_EPS);
 
     sr_pll.integral += SR_PLL_KI * phase_error * SR_SAMPLE_PERIOD_S;
     omega = SR_GRID_OMEGA + SR_PLL_KP * phase_error + sr_pll.integral;
 
     sr_state.frequency = omega / TWO_PI;
     sr_state.theta += omega * SR_SAMPLE_PERIOD_S;
+    if(Uq < 1.0f && Uq > -1.0f)
+    {
+        sr_pll.PLL_done_counter++;
+        if(sr_pll.PLL_done_counter >= 200)
+        {
+            sr_state.PLL_done = 1U;
+            sr_pll.PLL_done_counter = 200;
+        }
+    }
+    else
+    {
+        sr_pll.PLL_done_counter-=10;
+        if(sr_pll.PLL_done_counter <= 20)
+        {
+            sr_state.PLL_done = 0U;
+            if(sr_pll.PLL_done_counter < 0)
+            {
+                sr_pll.PLL_done_counter = 0;
+            }
+        }
+        
+    }
     if (sr_state.theta >= TWO_PI)
     {
         sr_state.theta -= TWO_PI;

@@ -36,6 +36,7 @@ typedef struct
     float x1;
     float x2;
     float integral;
+    int PLL_done_counter; /* 锁定计数器，连续 200 个采样点Uq小于 1则认为锁定。 */
 } SingleRectifier_Pll;
 
 static SingleRectifier_Pll sr_pll;
