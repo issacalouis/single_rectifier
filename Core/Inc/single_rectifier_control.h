@@ -12,15 +12,17 @@ typedef struct
     uint8_t PLL_done; /* PLL 锁定标志，0 未锁定，1 锁定 */
     float U_source_d; //电网侧d轴分量
     float U_source_q; //电网侧q轴分量
+    float Id;         /* 交流电流的 d 轴分量 */
+    float Iq;         /* 交流电流的 q 轴分量 */
 } SingleRectifier_ControlState;
 
 /* 重新采样或上电时调用，清除 PLL 状态。 */
 void SingleRectifier_ControlReset(void);
 
-/* 每个 ADC 采样帧调用一次，输入为去偏置后的电压 V1。
+/* 每个 ADC 采样帧调用一次，输入为去偏置后的电压 V1 和电流 I1。
  * 返回 1 表示本帧跨过电压正向过零点，供采样偏置按电网周期结算。
  */
-uint32_t SingleRectifier_ControlStep(float v1);
+uint32_t SingleRectifier_ControlStep(float v1, float i1);
 
 /* 读取快照；可在主循环调用。 */
 void SingleRectifier_GetState(SingleRectifier_ControlState *state);

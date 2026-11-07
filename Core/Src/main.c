@@ -44,6 +44,7 @@
 #define AC_Freq 50
 #define SQRT_2 1.41421356237f
 #define Wc (2*3.14159265359*AC_Freq)
+#define WL (0.2*3.14159265359)
 
 // PI控制器的相关参数
 #define Udc_Kp 0.1f // Udc环Kp
@@ -75,6 +76,8 @@ TIM_HandleTypeDef htim8;
 
 /* USER CODE BEGIN PV */
 INV_SamplingData realdata; // 采样处理后的真实数据
+
+SingleRectifier_ControlState pll_state;// 锁相环状态结构体
 // ===========================================================================
 // 变量定义
 static uint16_t clock_timer = 0; //控制环定时器
@@ -99,6 +102,21 @@ float Udc_ref = 32; // 直流电压输出参考值
 
 float Id_ref = 0.0f; // 直轴分量Id参考值
 float Iq_ref = 0.0f; // 交轴分量Iq参考值
+
+float grid_ud = 0.0f; // 电网侧d轴分量
+float grid_uq = 0.0f; // 电网侧q轴分量
+float grid_theta = 0.0f; // 电网电压相位
+// 电流内环
+float Id_in; // 直轴分量Id输入值
+float Iq_in; // 交轴分量Iq输入值
+float UI_d;
+float UI_q;
+float UI_alpha;
+float UI_beta;
+
+// PWM占空比
+float Duty1;
+float Duty2;
 
 // ===========================================================================
 /* USER CODE END PV */
@@ -697,6 +715,7 @@ void Keyboard_TickISR(void)
 目前已经实现
 1. 平均值有效值计算
 2. 电压外环
+3. 电流内环
 */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
@@ -705,6 +724,15 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
       clock_timer = (clock_timer + 1) % (uint16_t)(CLK_FREQ);
       circle_n = clock_timer%SAMPLE_POINT;
       INV_SamplingGetData(&realdata);
+      SingleRectifier_GetState(&pll_state);
+
+      grid_ud = pll_state.U_source_d;
+      grid_uq = pll_state.U_source_q;
+      grid_theta   = pll_state.theta;
+      grid_theta_sin = arm_sin_f32(grid_theta);
+      grid_theta_cos = arm_cos_f32(grid_theta);
+      Id_in = pll_state.Id;
+      Iq_in = pll_state.Iq;
       //============================================================
       // 1. 有效值平均值处理
       Uac_sum += realdata.ac[INV_SAMPLE_VOLTAGE1];
@@ -734,6 +762,23 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
       Id_ref = Udc_loop.Pos; // 直流电压环输出作为Id参考值
       Iq_ref = 0.0f; // 控制交轴分量Iq为0，实现功率因数为1的控制
       //============================================================
+      // 3. 电流内环
+      float Id_error = Id_ref - Id_in;
+      float Iq_error = Iq_ref - Iq_in;
+      PI_Pos_Cal(&Id_loop, Id_error);
+      PI_Pos_Cal(&Iq_loop, Iq_error);
+      UI_d = (-Id_loop.Pos+grid_ud-Iq_in*WL)/50.0f;
+      UI_q = (-Iq_loop.Pos+grid_uq+Id_in*WL)/50.0f;
+      arm_inv_park_f32(UI_d, UI_q, &UI_alpha, &UI_beta, grid_theta_sin, grid_theta_cos);
+      saturation(&UI_alpha, -0.95f, 0.95f);//这个是一个控制大小的函数，控制最小值和最大值在-0.95和+0.95之间
+
+	        // 单极性倍频调制
+	    Duty1 = (1 + UI_alpha) * 0.5f;//Duty1对应正极半桥桥臂（DQ解耦）
+	    Duty2 = (1 - UI_alpha) * 0.5f;//Duty2对应负极半桥桥臂（DQ解耦）
+	    TIM1->CCR1 = (int)(TIM1->ARR+1) * Duty2;
+	    TIM1->CCR2 = (int)(TIM1->ARR+1) * Duty1;
+
+
 
 
 

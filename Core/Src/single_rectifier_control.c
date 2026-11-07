@@ -32,6 +32,8 @@ void SingleRectifier_ControlReset(void)
 {
     sr_pll.x1 = 0.0f;
     sr_pll.x2 = 0.0f;
+    sr_pll.i1 = 0.0f;
+    sr_pll.i2 = 0.0f;
     sr_pll.integral = 0.0f;
     sr_pll.PLL_done_counter = 0U;
 
@@ -41,9 +43,11 @@ void SingleRectifier_ControlReset(void)
     sr_state.PLL_done = 0U;
     sr_state.U_source_d = 0.0f;
     sr_state.U_source_q = 0.0f;
+    sr_state.Id = 0.0f;
+    sr_state.Iq = 0.0f;
 }
 
-uint32_t SingleRectifier_ControlStep(float v1)
+uint32_t SingleRectifier_ControlStep(float v1, float i1)
 {
     float error;
     float peak;
@@ -60,11 +64,16 @@ uint32_t SingleRectifier_ControlStep(float v1)
     error = v1 - sr_pll.x1;
     sr_pll.x1 += SR_SAMPLE_PERIOD_S * SR_GRID_OMEGA * (SR_SOGI_K * error - sr_pll.x2);
     sr_pll.x2 += SR_SAMPLE_PERIOD_S * SR_GRID_OMEGA * sr_pll.x1;
+    error = i1 - sr_pll.i1;
+    sr_pll.i1 += SR_SAMPLE_PERIOD_S * SR_GRID_OMEGA * (SR_SOGI_K * error - sr_pll.i2);
+    sr_pll.i2 += SR_SAMPLE_PERIOD_S * SR_GRID_OMEGA * sr_pll.i1;
     peak = sqrtf(sr_pll.x1 * sr_pll.x1 + sr_pll.x2 * sr_pll.x2);
 
     SingleRectifier_SinCos(sr_state.theta, &sin_theta, &cos_theta);
     sr_state.U_source_d = sr_pll.x1 * sin_theta - sr_pll.x2 * cos_theta;
     sr_state.U_source_q = sr_pll.x1 * cos_theta + sr_pll.x2 * sin_theta;
+    sr_state.Id = sr_pll.i1 * sin_theta - sr_pll.i2 * cos_theta;
+    sr_state.Iq = sr_pll.i1 * cos_theta + sr_pll.i2 * sin_theta;
     phase_error = sr_state.U_source_q / (peak + SR_PLL_PEAK_EPS);
     // phase_error = (sr_pll.x1 * cos_theta + sr_pll.x2 * sin_theta) / (peak + SR_PLL_PEAK_EPS);
 
